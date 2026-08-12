@@ -224,43 +224,17 @@ body::before{
 .tp-ampm-lg.future-tp{background:rgba(124,92,252,0.1);border-color:rgba(124,92,252,0.4);color:#a688ff}
 .tp-sep-lg{color:var(--text2);font-family:'JetBrains Mono',monospace;font-size:1.1rem;margin:0 2px}
 
-/* ── MINUTE DRUM WHEEL ── */
-.min-drum{
+/* ── MINUTE ROTARY DIAL ── */
+.min-dial-wrap{
   position:relative;
-  border-radius:7px;
-  border:1px solid var(--border2);
-  background:rgba(255,255,255,0.07);
-  overflow:hidden;
-  cursor:ns-resize;
+  border-radius:50%;
+  flex-shrink:0;
+  cursor:grab;
   user-select:none;-webkit-user-select:none;
-  flex-shrink:0;
+  touch-action:none;
 }
-.min-drum.future-tp{border-color:rgba(124,92,252,0.4)}
-.min-drum-inner{
-  overflow-y:scroll;
-  scroll-snap-type:y mandatory;
-  scrollbar-width:none;-ms-overflow-style:none;
-  height:100%;
-}
-.min-drum-inner::-webkit-scrollbar{display:none}
-.min-drum-item{
-  display:flex;align-items:center;justify-content:center;
-  scroll-snap-align:start;
-  font-family:'JetBrains Mono',monospace;
-  font-weight:500;
-  color:var(--text3);
-  flex-shrink:0;
-  transition:color 0.15s;
-}
-.min-drum-item.active{color:var(--text1);font-weight:700}
-/* top/bottom fade to give depth illusion */
-.min-drum::before,.min-drum::after{
-  content:'';position:absolute;left:0;right:0;height:30%;pointer-events:none;z-index:2;
-}
-.min-drum::before{top:0;background:linear-gradient(to bottom,rgba(17,17,23,0.85),transparent)}
-.min-drum::after{bottom:0;background:linear-gradient(to top,rgba(17,17,23,0.85),transparent)}
-/* focus ring */
-.min-drum:focus-within{border-color:rgba(124,92,252,0.7);box-shadow:0 0 0 2px rgba(124,92,252,0.18)}
+.min-dial-wrap:active{cursor:grabbing}
+.min-dial-wrap canvas{display:block;border-radius:50%;}
 
 /* ══ ACTION BAR ══ */
 .action-bar{
@@ -568,97 +542,153 @@ function dayStatus(i){
 }
 
 /* ═══════════════════════════════════════════
-   MINUTE DRUM WHEEL
-   Returns {el, getValue:()=>int}
+   MINUTE ROTARY DIAL  (drag CW ↑ / CCW ↓)
+   Returns { el, getValue:()=>int }
 ═══════════════════════════════════════════ */
-function makeMinDrum(initMin, lg, isFuture, onMinChange){
-  const itemH = lg ? 36 : 28;   // height of each item in px
-  const visibleItems = 3;        // how many items show at once
-  const containerH = itemH * visibleItems;
-  const TOTAL = 60;
+function makeMinDial(initMin, lg, isFuture, onMinChange){
+  const SIZE   = lg ? 76 : 58;   // diameter px (CSS)
+  const DPR    = window.devicePixelRatio || 2;
+  const PX     = SIZE * DPR;     // canvas px
+  const CX     = PX / 2, CY = PX / 2;
+  const R_OUT  = PX / 2 - DPR;  // outer radius
+  const R_TRACK= R_OUT - 5*DPR; // arc track radius
+  const R_KNOB = 4*DPR;         // knob radius
 
-  const outer = document.createElement('div');
-  outer.className = 'min-drum' + (isFuture?' future-tp':'');
-  outer.style.cssText = `width:${lg?58:48}px;height:${containerH}px;`;
+  let currentMin = Math.max(0, Math.min(59, Math.round(initMin)));
 
-  const inner = document.createElement('div');
-  inner.className = 'min-drum-inner';
-  inner.style.cssText = `height:${containerH}px;`;
-  outer.appendChild(inner);
+  /* wrapper */
+  const wrap = document.createElement('div');
+  wrap.className = 'min-dial-wrap';
+  wrap.style.cssText = `width:${SIZE}px;height:${SIZE}px;`;
+  wrap.title = '드래그하여 분 선택';
 
-  // Padding items top + bottom so first/last value can center
-  const padCount = Math.floor(visibleItems/2); // 1
+  /* canvas */
+  const cv = document.createElement('canvas');
+  cv.width = PX; cv.height = PX;
+  cv.style.cssText = `width:${SIZE}px;height:${SIZE}px;`;
+  wrap.appendChild(cv);
+  const ctx = cv.getContext('2d');
 
-  // Add top pads
-  for(let p=0;p<padCount;p++){
-    const ghost=document.createElement('div');
-    ghost.className='min-drum-item';
-    ghost.style.cssText=`height:${itemH}px;font-size:${lg?'0.92':'0.78'}rem;opacity:0`;
-    ghost.textContent='00'; inner.appendChild(ghost);
+  /* rainbow colours for arc */
+  const RAINBOW = ['#ff0080','#ff4d00','#ffd700','#00e5a0','#00d4ff','#7c5cfc','#ff0080'];
+
+  function draw(){
+    ctx.clearRect(0,0,PX,PX);
+
+    /* background circle */
+    ctx.beginPath(); ctx.arc(CX,CY,R_OUT,0,Math.PI*2);
+    ctx.fillStyle = isFuture ? 'rgba(124,92,252,0.12)' : 'rgba(255,255,255,0.07)';
+    ctx.fill();
+    ctx.strokeStyle = isFuture ? 'rgba(124,92,252,0.5)' : 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 1.5*DPR; ctx.stroke();
+
+    /* tick marks every 5 min */
+    for(let m=0;m<60;m+=5){
+      const ang = (m/60)*Math.PI*2 - Math.PI/2;
+      const isMajor = m%15===0;
+      const len = isMajor ? 6*DPR : 4*DPR;
+      const r1 = R_OUT - 2*DPR;
+      ctx.beginPath();
+      ctx.moveTo(CX+Math.cos(ang)*(r1-len), CY+Math.sin(ang)*(r1-len));
+      ctx.lineTo(CX+Math.cos(ang)*r1,       CY+Math.sin(ang)*r1);
+      ctx.strokeStyle = isMajor ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)';
+      ctx.lineWidth = (isMajor?2:1.2)*DPR; ctx.stroke();
+    }
+
+    /* rainbow arc from 0 to current minute */
+    if(currentMin > 0){
+      const startAng = -Math.PI/2;
+      const endAng   = startAng + (currentMin/60)*Math.PI*2;
+      const grad = ctx.createLinearGradient(
+        CX+Math.cos(startAng)*R_TRACK, CY+Math.sin(startAng)*R_TRACK,
+        CX+Math.cos(endAng)*R_TRACK,   CY+Math.sin(endAng)*R_TRACK
+      );
+      RAINBOW.forEach((c,i)=>grad.addColorStop(i/(RAINBOW.length-1),c));
+      ctx.beginPath(); ctx.arc(CX,CY,R_TRACK,startAng,endAng);
+      ctx.strokeStyle=grad; ctx.lineWidth=5*DPR; ctx.lineCap='round'; ctx.stroke();
+    }
+
+    /* knob dot at current position */
+    const kAng = (currentMin/60)*Math.PI*2 - Math.PI/2;
+    const kx = CX+Math.cos(kAng)*R_TRACK;
+    const ky = CY+Math.sin(kAng)*R_TRACK;
+    ctx.beginPath(); ctx.arc(kx,ky,R_KNOB,0,Math.PI*2);
+    ctx.fillStyle='#fff';
+    ctx.shadowColor='rgba(255,255,255,0.8)'; ctx.shadowBlur=8*DPR;
+    ctx.fill();
+    ctx.shadowBlur=0;
+
+    /* centre label */
+    ctx.fillStyle='#e8e8f0';
+    ctx.font=`700 ${Math.round(SIZE*DPR*0.24)}px 'JetBrains Mono',monospace`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(pad(currentMin), CX, CY);
+
+    /* tiny "분" label */
+    ctx.fillStyle='rgba(160,160,192,0.7)';
+    ctx.font=`400 ${Math.round(SIZE*DPR*0.12)}px 'Outfit',sans-serif`;
+    ctx.fillText('분', CX, CY + SIZE*DPR*0.22);
+  }
+  draw();
+
+  /* ---- pointer tracking ---- */
+  let dragging=false, lastAngle=null, accumulated=0;
+
+  function getAngle(e){
+    const touch = e.touches?.[0];
+    const cx = touch?touch.clientX:e.clientX;
+    const cy = touch?touch.clientY:e.clientY;
+    const rect = cv.getBoundingClientRect();
+    const dx = cx - rect.left - SIZE/2;
+    const dy = cy - rect.top  - SIZE/2;
+    return Math.atan2(dy, dx); // -PI..PI
   }
 
-  // Add 00–59 items
-  let currentMin = initMin;
-  for(let i=0;i<TOTAL;i++){
-    const item=document.createElement('div');
-    item.className='min-drum-item'+(i===initMin?' active':'');
-    item.style.cssText=`height:${itemH}px;font-size:${lg?'0.92':'0.78'}rem;`;
-    item.textContent=pad(i);
-    item.dataset.val=i;
-    inner.appendChild(item);
+  function angleDiff(a, b){
+    /* signed shortest path between two angles */
+    let d = a - b;
+    while(d >  Math.PI) d -= Math.PI*2;
+    while(d < -Math.PI) d += Math.PI*2;
+    return d;
   }
 
-  // Add bottom pads
-  for(let p=0;p<padCount;p++){
-    const ghost=document.createElement('div');
-    ghost.className='min-drum-item';
-    ghost.style.cssText=`height:${itemH}px;font-size:${lg?'0.92':'0.78'}rem;opacity:0`;
-    ghost.textContent='00'; inner.appendChild(ghost);
+  function start(e){ e.preventDefault(); dragging=true; lastAngle=getAngle(e); accumulated=0; }
+
+  function move(e){
+    if(!dragging) return; e.preventDefault();
+    const ang = getAngle(e);
+    const delta = angleDiff(ang, lastAngle);  // radians rotated this frame
+    lastAngle = ang;
+    accumulated += delta;
+    /* convert radians -> minutes (full circle = 60 min = 2PI) */
+    const steps = Math.round(accumulated * 60 / (Math.PI*2));
+    if(steps !== 0){
+      accumulated -= steps * (Math.PI*2) / 60;
+      currentMin = (currentMin + steps + 60) % 60;
+      draw();
+      onMinChange(currentMin);
+    }
   }
 
-  // Scroll to initial position (offset by pad)
-  // Each real item index i is at scroll position i * itemH
-  inner.scrollTop = initMin * itemH;
+  function end(){ dragging=false; lastAngle=null; }
 
-  // Update active highlight
-  function updateActive(val){
-    inner.querySelectorAll('.min-drum-item[data-val]').forEach(el=>{
-      el.classList.toggle('active', parseInt(el.dataset.val)===val);
-    });
-  }
-
-  // On scroll end, snap and fire
-  let scrollTimer;
-  inner.addEventListener('scroll', ()=>{
-    clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(()=>{
-      const rawIdx = Math.round(inner.scrollTop / itemH);
-      const clamped = Math.max(0, Math.min(TOTAL-1, rawIdx));
-      inner.scrollTo({top: clamped * itemH, behavior:'smooth'});
-      currentMin = clamped;
-      updateActive(clamped);
-      onMinChange(clamped);
-    }, 80);
-  });
-
-  // Mouse wheel support (prevent page scroll when inside drum)
-  outer.addEventListener('wheel', (e)=>{
+  /* mouse */
+  cv.addEventListener('mousedown', start);
+  window.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  /* touch */
+  cv.addEventListener('touchstart', start, {passive:false});
+  window.addEventListener('touchmove', move, {passive:false});
+  window.addEventListener('touchend', end);
+  /* scroll wheel: 1 tick = 1 min */
+  wrap.addEventListener('wheel',(e)=>{
     e.preventDefault();
-    inner.scrollTop += e.deltaY > 0 ? itemH : -itemH;
-  }, {passive:false});
+    const step = e.deltaY>0 ? 1 : -1;
+    currentMin = (currentMin + step + 60) % 60;
+    draw(); onMinChange(currentMin);
+  },{passive:false});
 
-  // Click on item to select
-  inner.addEventListener('click', (e)=>{
-    const item = e.target.closest('[data-val]');
-    if(!item) return;
-    const val = parseInt(item.dataset.val);
-    inner.scrollTo({top: val * itemH, behavior:'smooth'});
-    currentMin = val;
-    updateActive(val);
-    onMinChange(val);
-  });
-
-  return { el: outer, getValue: ()=>currentMin };
+  return { el: wrap, getValue: ()=>currentMin };
 }
 
 /* ═══════════════════════════════════════════
@@ -695,8 +725,8 @@ function makeTimePicker(savedVal, type, size, onChange){
   const sep = document.createElement('span');
   sep.className=sepCls; sep.textContent=':';
 
-  // Minute DRUM
-  const drum = makeMinDrum(initM, lg, isFuture, (newMin)=>{
+  // Minute DIAL
+  const drum = makeMinDial(initM, lg, isFuture, (newMin)=>{
     fireChange();
   });
 
