@@ -155,18 +155,15 @@ body::before{
 }
 .tp-sel:hover{background:rgba(255,255,255,0.1)}
 .tp-sel:focus{border-color:rgba(124,92,252,0.7);box-shadow:0 0 0 2px rgba(124,92,252,0.18);background:rgba(124,92,252,0.08)}
-.tp-ampm{
-  font-size:0.72rem;font-weight:700;min-width:42px;
-  background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:var(--cyan);
+/* fix option readability on PC — force dark bg / light text */
+.tp-sel option,.tp-sel-lg option{
+  background:#1a1a24;color:#e8e8f0;
 }
-.tp-ampm:focus{border-color:rgba(0,212,255,0.7);box-shadow:0 0 0 2px rgba(0,212,255,0.18)}
 .tp-sep{color:var(--text2);font-family:'JetBrains Mono',monospace;font-size:0.9rem;margin:0 1px}
 
 /* future plan color tint */
 .tp-sel.future-tp{border-color:rgba(124,92,252,0.4)}
 .tp-sel.future-tp:focus{border-color:rgba(124,92,252,0.8)}
-.tp-ampm.future-tp{background:rgba(124,92,252,0.1);border-color:rgba(124,92,252,0.4);color:#a688ff}
-.tp-ampm.future-tp:focus{border-color:rgba(124,92,252,0.8);box-shadow:0 0 0 2px rgba(124,92,252,0.18)}
 
 /* pills */
 .status-pill{
@@ -216,25 +213,9 @@ body::before{
   -webkit-tap-highlight-color:transparent;
 }
 .tp-sel-lg:focus{border-color:rgba(124,92,252,0.7);box-shadow:0 0 0 3px rgba(124,92,252,0.2);background:rgba(124,92,252,0.08)}
-.tp-ampm-lg{
-  font-size:0.88rem;font-weight:700;min-width:52px;
-  background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:var(--cyan);
-}
-.tp-ampm-lg:focus{border-color:rgba(0,212,255,0.7);box-shadow:0 0 0 3px rgba(0,212,255,0.2)}
-.tp-ampm-lg.future-tp{background:rgba(124,92,252,0.1);border-color:rgba(124,92,252,0.4);color:#a688ff}
+.tp-sel-lg.future-tp{border-color:rgba(124,92,252,0.4)}
+.tp-sel-lg.future-tp:focus{border-color:rgba(124,92,252,0.8)}
 .tp-sep-lg{color:var(--text2);font-family:'JetBrains Mono',monospace;font-size:1.1rem;margin:0 2px}
-
-/* ── MINUTE ROTARY DIAL ── */
-.min-dial-wrap{
-  position:relative;
-  border-radius:50%;
-  flex-shrink:0;
-  cursor:grab;
-  user-select:none;-webkit-user-select:none;
-  touch-action:none;
-}
-.min-dial-wrap:active{cursor:grabbing}
-.min-dial-wrap canvas{display:block;border-radius:50%;}
 
 /* ── TIME PICKER WRAPPER (outer flex column) ── */
 .tp-outer{
@@ -555,153 +536,27 @@ function dayStatus(i){
 }
 
 /* ═══════════════════════════════════════════
-   MINUTE ROTARY DIAL  (drag CW ↑ / CCW ↓)
+   MINUTE SELECT  (same style as hour)
    Returns { el, getValue:()=>int }
 ═══════════════════════════════════════════ */
-function makeMinDial(initMin, lg, isFuture, onMinChange){
-  const SIZE   = lg ? 76 : 58;   // diameter px (CSS)
-  const DPR    = window.devicePixelRatio || 2;
-  const PX     = SIZE * DPR;     // canvas px
-  const CX     = PX / 2, CY = PX / 2;
-  const R_OUT  = PX / 2 - DPR;  // outer radius
-  const R_TRACK= R_OUT - 5*DPR; // arc track radius
-  const R_KNOB = 4*DPR;         // knob radius
+function makeMinSel(initMin, lg, isFuture, onMinChange){
+  const selCls = lg ? 'tp-sel-lg' : 'tp-sel';
+  const isFutureClass = isFuture ? ' future-tp' : '';
 
-  let currentMin = Math.max(0, Math.min(59, Math.round(initMin)));
+  const minSel = document.createElement('select');
+  minSel.className = `${selCls}${isFutureClass}`;
+  minSel.style.width = lg ? '62px' : '52px';
 
-  /* wrapper */
-  const wrap = document.createElement('div');
-  wrap.className = 'min-dial-wrap';
-  wrap.style.cssText = `width:${SIZE}px;height:${SIZE}px;`;
-  wrap.title = '드래그하여 분 선택';
-
-  /* canvas */
-  const cv = document.createElement('canvas');
-  cv.width = PX; cv.height = PX;
-  cv.style.cssText = `width:${SIZE}px;height:${SIZE}px;`;
-  wrap.appendChild(cv);
-  const ctx = cv.getContext('2d');
-
-  /* rainbow colours for arc */
-  const RAINBOW = ['#ff0080','#ff4d00','#ffd700','#00e5a0','#00d4ff','#7c5cfc','#ff0080'];
-
-  function draw(){
-    ctx.clearRect(0,0,PX,PX);
-
-    /* background circle */
-    ctx.beginPath(); ctx.arc(CX,CY,R_OUT,0,Math.PI*2);
-    ctx.fillStyle = isFuture ? 'rgba(124,92,252,0.12)' : 'rgba(255,255,255,0.07)';
-    ctx.fill();
-    ctx.strokeStyle = isFuture ? 'rgba(124,92,252,0.5)' : 'rgba(255,255,255,0.18)';
-    ctx.lineWidth = 1.5*DPR; ctx.stroke();
-
-    /* tick marks every 5 min */
-    for(let m=0;m<60;m+=5){
-      const ang = (m/60)*Math.PI*2 - Math.PI/2;
-      const isMajor = m%15===0;
-      const len = isMajor ? 6*DPR : 4*DPR;
-      const r1 = R_OUT - 2*DPR;
-      ctx.beginPath();
-      ctx.moveTo(CX+Math.cos(ang)*(r1-len), CY+Math.sin(ang)*(r1-len));
-      ctx.lineTo(CX+Math.cos(ang)*r1,       CY+Math.sin(ang)*r1);
-      ctx.strokeStyle = isMajor ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)';
-      ctx.lineWidth = (isMajor?2:1.2)*DPR; ctx.stroke();
-    }
-
-    /* rainbow arc from 0 to current minute */
-    if(currentMin > 0){
-      const startAng = -Math.PI/2;
-      const endAng   = startAng + (currentMin/60)*Math.PI*2;
-      const grad = ctx.createLinearGradient(
-        CX+Math.cos(startAng)*R_TRACK, CY+Math.sin(startAng)*R_TRACK,
-        CX+Math.cos(endAng)*R_TRACK,   CY+Math.sin(endAng)*R_TRACK
-      );
-      RAINBOW.forEach((c,i)=>grad.addColorStop(i/(RAINBOW.length-1),c));
-      ctx.beginPath(); ctx.arc(CX,CY,R_TRACK,startAng,endAng);
-      ctx.strokeStyle=grad; ctx.lineWidth=5*DPR; ctx.lineCap='round'; ctx.stroke();
-    }
-
-    /* knob dot at current position */
-    const kAng = (currentMin/60)*Math.PI*2 - Math.PI/2;
-    const kx = CX+Math.cos(kAng)*R_TRACK;
-    const ky = CY+Math.sin(kAng)*R_TRACK;
-    ctx.beginPath(); ctx.arc(kx,ky,R_KNOB,0,Math.PI*2);
-    ctx.fillStyle='#fff';
-    ctx.shadowColor='rgba(255,255,255,0.8)'; ctx.shadowBlur=8*DPR;
-    ctx.fill();
-    ctx.shadowBlur=0;
-
-    /* centre label */
-    ctx.fillStyle='#e8e8f0';
-    ctx.font=`700 ${Math.round(SIZE*DPR*0.24)}px 'JetBrains Mono',monospace`;
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(pad(currentMin), CX, CY);
-
-    /* tiny "분" label */
-    ctx.fillStyle='rgba(160,160,192,0.7)';
-    ctx.font=`400 ${Math.round(SIZE*DPR*0.12)}px 'Outfit',sans-serif`;
-    ctx.fillText('분', CX, CY + SIZE*DPR*0.22);
+  for(let i=0; i<60; i++){
+    const o = document.createElement('option');
+    o.value = i; o.textContent = pad(i);
+    minSel.appendChild(o);
   }
-  draw();
+  minSel.value = Math.max(0, Math.min(59, Math.round(initMin)));
 
-  /* ---- pointer tracking ---- */
-  let dragging=false, lastAngle=null, accumulated=0;
+  minSel.addEventListener('change', () => onMinChange(parseInt(minSel.value)));
 
-  function getAngle(e){
-    const touch = e.touches?.[0];
-    const cx = touch?touch.clientX:e.clientX;
-    const cy = touch?touch.clientY:e.clientY;
-    const rect = cv.getBoundingClientRect();
-    const dx = cx - rect.left - SIZE/2;
-    const dy = cy - rect.top  - SIZE/2;
-    return Math.atan2(dy, dx); // -PI..PI
-  }
-
-  function angleDiff(a, b){
-    /* signed shortest path between two angles */
-    let d = a - b;
-    while(d >  Math.PI) d -= Math.PI*2;
-    while(d < -Math.PI) d += Math.PI*2;
-    return d;
-  }
-
-  function start(e){ e.preventDefault(); dragging=true; lastAngle=getAngle(e); accumulated=0; }
-
-  function move(e){
-    if(!dragging) return; e.preventDefault();
-    const ang = getAngle(e);
-    const delta = angleDiff(ang, lastAngle);  // radians rotated this frame
-    lastAngle = ang;
-    accumulated += delta;
-    /* convert radians -> minutes (full circle = 60 min = 2PI) */
-    const steps = Math.round(accumulated * 60 / (Math.PI*2));
-    if(steps !== 0){
-      accumulated -= steps * (Math.PI*2) / 60;
-      currentMin = (currentMin + steps + 60) % 60;
-      draw();
-      onMinChange(currentMin);
-    }
-  }
-
-  function end(){ dragging=false; lastAngle=null; }
-
-  /* mouse */
-  cv.addEventListener('mousedown', start);
-  window.addEventListener('mousemove', move);
-  window.addEventListener('mouseup', end);
-  /* touch */
-  cv.addEventListener('touchstart', start, {passive:false});
-  window.addEventListener('touchmove', move, {passive:false});
-  window.addEventListener('touchend', end);
-  /* scroll wheel: 1 tick = 1 min */
-  wrap.addEventListener('wheel',(e)=>{
-    e.preventDefault();
-    const step = e.deltaY>0 ? 1 : -1;
-    currentMin = (currentMin + step + 60) % 60;
-    draw(); onMinChange(currentMin);
-  },{passive:false});
-
-  return { el: wrap, getValue: ()=>currentMin };
+  return { el: minSel, getValue: () => parseInt(minSel.value) };
 }
 
 /* ═══════════════════════════════════════════
@@ -740,8 +595,8 @@ function makeTimePicker(savedVal, type, size, onChange){
   const sep = document.createElement('span');
   sep.className = sepCls; sep.textContent = ':';
 
-  // Minute rotary dial
-  const dial = makeMinDial(initM, lg, isFuture, ()=>{ fireChange(); });
+  // Minute select
+  const dial = makeMinSel(initM, lg, isFuture, ()=>{ fireChange(); });
 
   wrap.append(hourSel, sep, dial.el);
 
