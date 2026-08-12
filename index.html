@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>퇴근해 · 주간 근무 트래커</title>
+<meta name="description" content="주간 근무 시간을 추적하고 정확한 퇴근 시간을 확인하세요."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#0b0b0f;
+  --bg2:#111117;
+  --bg3:#16161e;
+  --border:rgba(255,255,255,0.08);
+  --border2:rgba(255,255,255,0.14);
+  --text1:#e8e8f0;
+  --text2:#7a7a96;
+  --text3:#a0a0c0;
+  --accent:#7c5cfc;
+  --cyan:#00d4ff;
+  --green:#00e5a0;
+  --pink:#ff4d8d;
+  --yellow:#ffd93d;
+  --orange:#ff8c42;
+  --r:14px;
+  --r-sm:9px;
+}
+
+html{font-size:17px}
+body{
+  font-family:'Outfit',sans-serif;
+  background:var(--bg);
+  color:var(--text1);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:0;opacity:0.6;
+}
+
+.glow-a{position:fixed;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(124,92,252,0.14),transparent 70%);top:-200px;left:-200px;pointer-events:none;z-index:0}
+.glow-b{position:fixed;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(0,212,255,0.09),transparent 70%);bottom:-150px;right:-100px;pointer-events:none;z-index:0}
+
+.app{position:relative;z-index:1;max-width:1140px;margin:0 auto;padding:2rem 1.5rem 5rem}
+
+/* ── HEADER ── */
+.header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:2.5rem;padding-bottom:1.5rem;
+  border-bottom:1px solid var(--border);
+  animation:fadeDown 0.6s ease both;
+  gap:1.5rem;
+}
+@keyframes fadeDown{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:none}}
+
+.header-left{display:flex;align-items:center;gap:1.4rem}
+
+/* ── BIG LION ── */
+.logo-img{
+  height:120px;   /* 3× bigger (was 40px) */
+  width:auto;
+  filter:drop-shadow(0 0 24px rgba(124,92,252,0.5)) drop-shadow(0 0 48px rgba(0,212,255,0.25));
+  animation:lionFloat 4s ease-in-out infinite;
+  flex-shrink:0;
+}
+@keyframes lionFloat{
+  0%,100%{transform:translateY(0) rotate(-1deg)}
+  50%{transform:translateY(-8px) rotate(1deg)}
+}
+
+.header-title h1{font-size:1.7rem;font-weight:800;letter-spacing:-0.03em;line-height:1.1}
+.header-title h1 span{
+  background:linear-gradient(90deg,#7c5cfc,#00d4ff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.header-title p{font-size:0.9rem;color:var(--text2);margin-top:0.3rem;font-weight:400}
+
+.header-right{display:flex;flex-direction:column;align-items:flex-end;gap:0.25rem}
+.live-badge{
+  display:flex;align-items:center;gap:0.4rem;
+  font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;
+  color:var(--green);background:rgba(0,229,160,0.1);border:1px solid rgba(0,229,160,0.3);
+  padding:0.25rem 0.7rem;border-radius:50px;
+}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.8)}}
+#clock-display{
+  font-family:'JetBrains Mono',monospace;
+  font-size:2rem;font-weight:700;letter-spacing:-0.02em;
+  background:linear-gradient(90deg,#00d4ff,#7c5cfc);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+#date-display{font-size:0.85rem;color:var(--text3);font-family:'JetBrains Mono',monospace}
+
+/* ── SECTION LABEL ── */
+.sec-label{
+  font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.16em;
+  color:var(--text2);display:flex;align-items:center;gap:0.6rem;margin-bottom:1rem;
+}
+.sec-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── WEEKLY GRID ── */
+.week-grid-card{
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);
+  overflow:hidden;margin-bottom:1.5rem;
+  animation:fadeUp 0.6s ease 0.15s both;
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+
+.week-grid-header{
+  display:grid;grid-template-columns:100px repeat(5,1fr);
+  background:var(--bg3);border-bottom:1px solid var(--border);
+}
+.wgh-cell{
+  padding:0.85rem 0.6rem;text-align:center;
+  font-size:0.82rem;font-weight:600;color:var(--text2);
+  border-right:1px solid var(--border);
+}
+.wgh-cell:first-child{text-align:left;padding-left:1.1rem}
+.wgh-cell:last-child{border-right:none}
+.wgh-cell .day-name{font-weight:700;color:var(--text3);font-size:0.88rem}
+.wgh-cell.today-col .day-name{color:var(--cyan)}
+.today-badge{
+  display:inline-block;background:rgba(0,212,255,0.15);border:1px solid rgba(0,212,255,0.4);
+  color:var(--cyan);font-size:0.68rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:4px;
+  margin-top:0.3rem;letter-spacing:0.04em;
+}
+
+.week-row{
+  display:grid;grid-template-columns:100px repeat(5,1fr);
+  border-bottom:1px solid var(--border);
+  transition:background 0.2s;
+}
+.week-row:last-child{border-bottom:none}
+.week-row:hover{background:rgba(255,255,255,0.02)}
+
+.row-label{
+  padding:0.7rem 0.6rem 0.7rem 1.1rem;
+  font-size:0.8rem;color:var(--text2);border-right:1px solid var(--border);
+  display:flex;align-items:center;font-weight:500;
+}
+
+.day-cell{
+  padding:0.5rem 0.4rem;text-align:center;border-right:1px solid var(--border);
+  font-size:0.88rem;
+  display:flex;align-items:center;justify-content:center;
+  min-height:46px;
+}
+.day-cell:last-child{border-right:none}
+.day-cell.past{color:var(--text3);font-family:'JetBrains Mono',monospace}
+.dash-mark{color:var(--border2);font-size:1.1rem}
+
+/* ── STATUS PILLS ── */
+.status-pill{
+  display:inline-flex;align-items:center;gap:0.3rem;
+  font-size:0.72rem;font-weight:700;padding:0.25rem 0.65rem;border-radius:50px;
+  letter-spacing:0.04em;
+}
+.pill-done{background:rgba(0,229,160,0.15);border:1px solid rgba(0,229,160,0.4);color:var(--green)}
+.pill-today{background:rgba(0,212,255,0.15);border:1px solid rgba(0,212,255,0.5);color:var(--cyan);animation:todayGlow 2s ease-in-out infinite}
+@keyframes todayGlow{0%,100%{box-shadow:0 0 0 0 rgba(0,212,255,0)}50%{box-shadow:0 0 10px 3px rgba(0,212,255,0.2)}}
+.pill-plan{background:rgba(124,92,252,0.15);border:1px solid rgba(124,92,252,0.4);color:#a688ff}
+
+/* ── CUSTOM TIME PICKER ── */
+.time-picker{
+  display:flex;align-items:center;gap:3px;
+  justify-content:center;
+}
+.tp-select{
+  appearance:none;-webkit-appearance:none;
+  background:rgba(255,255,255,0.07);
+  border:1px solid var(--border2);
+  border-radius:var(--r-sm);
+  padding:0.3rem 0.3rem;
+  color:var(--text1);
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.82rem;
+  font-weight:500;
+  outline:none;
+  cursor:pointer;
+  text-align:center;
+  transition:border-color 0.2s,box-shadow 0.2s,background 0.2s;
+}
+.tp-select:hover{background:rgba(255,255,255,0.1)}
+.tp-select:focus{border-color:rgba(124,92,252,0.7);box-shadow:0 0 0 2px rgba(124,92,252,0.18);background:rgba(124,92,252,0.08)}
+.tp-ampm{
+  font-size:0.75rem;font-weight:700;letter-spacing:0.02em;
+  background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.35);
+  color:var(--cyan);padding:0.3rem 0.35rem;border-radius:var(--r-sm);min-width:44px;
+}
+.tp-ampm:focus{border-color:rgba(0,212,255,0.7);box-shadow:0 0 0 2px rgba(0,212,255,0.18)}
+.tp-sep{color:var(--text2);font-family:'JetBrains Mono',monospace;font-size:0.9rem;margin:0 1px}
+
+/* today column picker colours */
+.day-cell.today-col .tp-select:focus{border-color:rgba(0,212,255,0.7);box-shadow:0 0 0 2px rgba(0,212,255,0.18);background:rgba(0,212,255,0.06)}
+
+/* future hours number input */
+.hrs-input-wrap{display:flex;align-items:center;gap:5px;justify-content:center}
+.hrs-input{
+  appearance:none;-webkit-appearance:none;
+  background:rgba(255,255,255,0.07);border:1px solid var(--border2);
+  border-radius:var(--r-sm);padding:0.3rem 0.5rem;color:var(--text1);
+  font-family:'JetBrains Mono',monospace;font-size:0.88rem;font-weight:600;
+  outline:none;width:64px;text-align:center;
+  transition:border-color 0.2s,box-shadow 0.2s;
+}
+.hrs-input:focus{border-color:rgba(124,92,252,0.7);box-shadow:0 0 0 2px rgba(124,92,252,0.18)}
+.hrs-unit{font-size:0.8rem;color:var(--text2);font-weight:500}
+
+/* ── ACTION BAR ── */
+.action-bar{
+  background:var(--bg3);padding:0.9rem 1.1rem;
+  display:flex;align-items:center;justify-content:flex-end;gap:0.8rem;
+  border-top:1px solid var(--border);
+}
+.btn-primary{
+  padding:0.6rem 1.4rem;border:none;border-radius:var(--r-sm);
+  font-family:'Outfit',sans-serif;font-size:0.9rem;font-weight:700;color:#fff;
+  cursor:pointer;background:linear-gradient(135deg,#7c5cfc,#00d4ff);
+  box-shadow:0 4px 18px rgba(124,92,252,0.4);
+  transition:transform 0.2s,box-shadow 0.2s;letter-spacing:0.02em;
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 26px rgba(124,92,252,0.6)}
+.btn-primary:active{transform:translateY(0)}
+.btn-ghost{
+  padding:0.6rem 1.1rem;border:1px solid var(--border2);border-radius:var(--r-sm);
+  background:transparent;color:var(--text3);font-family:'Outfit',sans-serif;
+  font-size:0.88rem;cursor:pointer;transition:all 0.2s;
+}
+.btn-ghost:hover{background:rgba(255,255,255,0.05);color:var(--text1)}
+
+/* ── STATS ROW ── */
+.stats-row{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;
+  margin-bottom:1.5rem;
+  animation:fadeUp 0.6s ease 0.3s both;
+}
+@media(max-width:620px){.stats-row{grid-template-columns:1fr 1fr}}
+.stat-card{
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);
+  padding:1.2rem 1.1rem;position:relative;overflow:hidden;
+  transition:border-color 0.25s,transform 0.25s;
+}
+.stat-card:hover{border-color:var(--border2);transform:translateY(-2px)}
+.stat-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:var(--gradient, linear-gradient(90deg,#7c5cfc,#00d4ff));
+}
+.sc-g1{--gradient:linear-gradient(90deg,#7c5cfc,#00d4ff)}
+.sc-g2{--gradient:linear-gradient(90deg,#ff4d8d,#ffd93d)}
+.sc-g3{--gradient:linear-gradient(90deg,#00e5a0,#00d4ff)}
+.sc-g4{--gradient:linear-gradient(90deg,#ffd93d,#ff8c42)}
+.stat-val{font-size:2rem;font-weight:800;letter-spacing:-0.03em;margin-bottom:0.3rem;font-variant-numeric:tabular-nums}
+.sv-purple{background:linear-gradient(135deg,#7c5cfc,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.sv-pink{background:linear-gradient(135deg,#ff4d8d,#ffd93d);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.sv-green{background:linear-gradient(135deg,#00e5a0,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.sv-yellow{background:linear-gradient(135deg,#ffd93d,#ff8c42);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.stat-label{font-size:0.78rem;color:var(--text2);font-weight:500;letter-spacing:0.06em;text-transform:uppercase}
+
+/* ── PROGRESS ── */
+.progress-card{
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);
+  padding:1.6rem;margin-bottom:1.5rem;
+  animation:fadeUp 0.6s ease 0.4s both;
+}
+.prog-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.3rem}
+.prog-title{font-size:1.1rem;font-weight:700}
+.prog-pct-badge{
+  font-size:0.88rem;font-weight:700;font-family:'JetBrains Mono',monospace;
+  background:rgba(124,92,252,0.15);border:1px solid rgba(124,92,252,0.3);
+  color:#a688ff;padding:0.3rem 0.8rem;border-radius:50px;
+}
+
+.rainbow-bar-wrap{
+  position:relative;height:40px;border-radius:50px;
+  background:rgba(255,255,255,0.04);border:1px solid var(--border2);
+  overflow:hidden;margin-bottom:0.8rem;
+}
+.rainbow-fill{
+  height:100%;border-radius:50px;width:0%;
+  background:linear-gradient(90deg,#ff0080,#ff3040,#ff6820,#ffd700,#40ff00,#00ffcc,#00ccff,#5555ff,#cc00ff,#ff0080);
+  background-size:400% 100%;
+  animation:rainbowFlow 5s linear infinite;
+  transition:width 1.5s cubic-bezier(0.34,1.56,0.64,1);
+  position:relative;
+}
+@keyframes rainbowFlow{0%{background-position:0% 50%}100%{background-position:400% 50%}}
+.rainbow-fill::after{content:'';position:absolute;inset:0;border-radius:50px;background:linear-gradient(180deg,rgba(255,255,255,0.42) 0%,transparent 55%)}
+.rainbow-fill::before{content:'';position:absolute;right:-3px;top:50%;transform:translateY(-50%);width:28px;height:28px;border-radius:50%;background:inherit;filter:blur(7px);opacity:0.85}
+.bar-shimmer{position:absolute;inset:0;border-radius:50px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.28),transparent);animation:shimmerSweep 2.5s ease-in-out infinite}
+@keyframes shimmerSweep{0%{transform:translateX(-150%)}100%{transform:translateX(500%)}}
+.bar-marks{position:absolute;inset:0;border-radius:50px;pointer-events:none}
+.bar-mark{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.2)}
+
+.prog-labels{display:flex;justify-content:space-between;font-size:0.82rem;color:var(--text2);font-family:'JetBrains Mono',monospace}
+.prog-labels span:nth-child(2){font-weight:600;color:var(--text1)}
+
+.predict-banner{
+  margin-top:1.3rem;padding:1.1rem 1.3rem;border-radius:var(--r-sm);
+  background:rgba(124,92,252,0.08);border:1px solid rgba(124,92,252,0.25);
+  display:flex;align-items:flex-start;gap:0.9rem;font-size:0.9rem;line-height:1.7;
+}
+.predict-icon{font-size:1.4rem;flex-shrink:0;margin-top:0.1rem}
+.predict-text strong{color:#a688ff}
+.predict-text .highlight{
+  background:linear-gradient(90deg,#7c5cfc,#00d4ff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  font-weight:700;font-size:0.95rem;
+}
+.done-banner{
+  margin-top:1.3rem;padding:1.2rem 1.4rem;border-radius:var(--r-sm);
+  background:linear-gradient(135deg,rgba(0,229,160,0.15),rgba(0,212,255,0.1));
+  border:1px solid rgba(0,229,160,0.4);
+  display:flex;align-items:center;gap:0.9rem;font-size:0.95rem;
+}
+.done-banner .done-icon{font-size:2rem;animation:bounce 1s ease-in-out infinite}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.done-banner strong{color:var(--green);font-size:1.05rem}
+
+/* ── TOAST ── */
+.toast{
+  position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(80px);
+  background:rgba(22,22,30,0.95);backdrop-filter:blur(16px);
+  border:1px solid var(--border2);border-radius:50px;
+  padding:0.75rem 1.5rem;font-size:0.9rem;color:var(--text1);
+  z-index:999;transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1),opacity 0.35s;
+  opacity:0;pointer-events:none;white-space:nowrap;
+}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+footer{text-align:center;color:var(--text2);font-size:0.8rem;padding-top:2rem;animation:fadeUp 0.6s ease 0.5s both}
+
+@media(max-width:720px){
+  .week-grid-header,.week-row{grid-template-columns:72px repeat(5,1fr)}
+  .wgh-cell{padding:0.6rem 0.25rem;font-size:0.72rem}
+  .row-label{font-size:0.72rem;padding-left:0.6rem}
+  .tp-select{font-size:0.7rem}
+  .stats-row{grid-template-columns:1fr 1fr;gap:0.7rem}
+}
+</style>
+</head>
+<body>
+<div class="glow-a"></div>
+<div class="glow-b"></div>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-left">
+      <img class="logo-img" src="jj라이언~.svg" alt="라이언 로고" onerror="this.style.display='none'"/>
+      <div class="header-title">
+        <h1>이제 <span>퇴근</span>해도 돼</h1>
+        <p>주간 근무 시간 트래커 · 휴게 자동 계산</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+      <div id="clock-display">00:00:00</div>
+      <div id="date-display">로딩 중...</div>
+    </div>
+  </header>
+
+  <!-- WEEK GRID -->
+  <div class="sec-label">📅 이번 주 근무 현황</div>
+
+  <div class="week-grid-card">
+    <div class="week-grid-header" id="week-header">
+      <div class="wgh-cell">구분</div>
+    </div>
+    <div id="week-rows"></div>
+    <div class="action-bar">
+      <button class="btn-ghost" id="btn-reset">초기화</button>
+      <button class="btn-primary" id="btn-calc">✦ 계산하기</button>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat-card sc-g1">
+      <div class="stat-val sv-purple" id="st-worked">0h</div>
+      <div class="stat-label">실 근무 시간</div>
+    </div>
+    <div class="stat-card sc-g2">
+      <div class="stat-val sv-pink" id="st-remain">40h</div>
+      <div class="stat-label">남은 시간</div>
+    </div>
+    <div class="stat-card sc-g3">
+      <div class="stat-val sv-green" id="st-break">0h</div>
+      <div class="stat-label">차감 휴게</div>
+    </div>
+    <div class="stat-card sc-g4">
+      <div class="stat-val sv-yellow" id="st-pct">0%</div>
+      <div class="stat-label">달성률</div>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-card">
+    <div class="prog-header">
+      <div class="prog-title">주 40시간 달성 현황</div>
+      <div class="prog-pct-badge" id="pct-badge">0%</div>
+    </div>
+    <div class="rainbow-bar-wrap">
+      <div class="rainbow-fill" id="bar-fill"></div>
+      <div class="bar-shimmer"></div>
+      <div class="bar-marks" id="bar-marks"></div>
+    </div>
+    <div class="prog-labels">
+      <span>0h</span>
+      <span id="prog-mid">—</span>
+      <span>40h</span>
+    </div>
+    <div id="predict-area"></div>
+  </div>
+
+  <footer>💜 퇴근해 트래커 · 현명하게 일하고 제때 퇴근하세요</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─────────────────────────────────────────────
+//  HELPERS
+// ─────────────────────────────────────────────
+const TARGET = 40;
+const DAYS_KO = ['일','월','화','수','목','금','토'];
+const STORE_KEY = 'gohome-v4';
+
+function pad(n){ return String(n).padStart(2,'0'); }
+function calcBreak(g){ return g <= 0 ? 0 : Math.floor(g/4)*0.5; }
+function netHrs(g){ return Math.max(0, g - calcBreak(g)); }
+function fmtHr(h){
+  if(h == null || isNaN(h) || h < 0) return '—';
+  if(h === 0) return '0h';
+  const w = Math.floor(h), m = Math.round((h-w)*60);
+  return m === 0 ? `${w}h` : `${w}h ${pad(m)}m`;
+}
+
+function getMonday(d){
+  const dt = new Date(d);
+  const day = dt.getDay();
+  dt.setDate(dt.getDate() + (day===0 ? -6 : 1-day));
+  dt.setHours(0,0,0,0);
+  return dt;
+}
+
+// ─────────────────────────────────────────────
+//  LIVE CLOCK
+// ─────────────────────────────────────────────
+function tick(){
+  const now = new Date();
+  const h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
+  const ampm = h>=12?'오후':'오전', h12 = h%12||12;
+  document.getElementById('clock-display').textContent = `${pad(h12)}:${pad(m)}:${pad(s)}`;
+  const yr=now.getFullYear(), mo=now.getMonth()+1, da=now.getDate();
+  document.getElementById('date-display').textContent =
+    `${yr}년 ${mo}월 ${da}일 (${DAYS_KO[now.getDay()]}요일) · ${ampm}`;
+}
+tick(); setInterval(tick, 1000);
+
+// ─────────────────────────────────────────────
+//  DATA
+// ─────────────────────────────────────────────
+function loadData(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY))||{}; }catch{ return {}; } }
+function saveData(d){ localStorage.setItem(STORE_KEY, JSON.stringify(d)); }
+
+// ─────────────────────────────────────────────
+//  TIME PICKER BUILDER
+//  Returns a div.time-picker and a getValue() fn returning decimal hours or null
+// ─────────────────────────────────────────────
+function makeTimePicker(savedVal, isToday, onChange){
+  // savedVal: "HH:MM" 24h string or null
+  let initH24 = null, initM = 0;
+  if(savedVal){
+    const parts = savedVal.split(':');
+    initH24 = parseInt(parts[0]);
+    initM   = parseInt(parts[1]);
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'time-picker';
+
+  // 오전/오후 select
+  const ampmSel = document.createElement('select');
+  ampmSel.className = `tp-select tp-ampm${isToday?' today-col':''}`;
+  ['오전','오후'].forEach(v=>{ const o=document.createElement('option');o.value=v;o.textContent=v;ampmSel.appendChild(o); });
+
+  // Hour select (1–12)
+  const hourSel = document.createElement('select');
+  hourSel.className = `tp-select`;
+  hourSel.style.width = '52px';
+  for(let i=1;i<=12;i++){ const o=document.createElement('option');o.value=i;o.textContent=pad(i);hourSel.appendChild(o); }
+
+  const sep = document.createElement('span');
+  sep.className = 'tp-sep'; sep.textContent = ':';
+
+  // Minute select (00, 10, 20, 30, 40, 50)
+  const minSel = document.createElement('select');
+  minSel.className = `tp-select`;
+  minSel.style.width = '52px';
+  for(let i=0;i<60;i+=10){ const o=document.createElement('option');o.value=i;o.textContent=pad(i);minSel.appendChild(o); }
+
+  // Set initial values
+  if(initH24 !== null){
+    ampmSel.value = initH24 >= 12 ? '오후' : '오전';
+    let h12 = initH24 % 12; if(h12===0) h12=12;
+    hourSel.value = h12;
+    // round to nearest 10
+    minSel.value = Math.round(initM/10)*10 % 60;
+  } else {
+    ampmSel.value = '오전';
+    hourSel.value = 9;
+    minSel.value = 0;
+  }
+
+  wrap.appendChild(ampmSel);
+  wrap.appendChild(hourSel);
+  wrap.appendChild(sep);
+  wrap.appendChild(minSel);
+
+  function getValue(){
+    const ap = ampmSel.value;
+    let h = parseInt(hourSel.value);
+    const m = parseInt(minSel.value);
+    if(ap==='오후' && h!==12) h += 12;
+    if(ap==='오전' && h===12) h = 0;
+    return h + m/60;
+  }
+  function get24String(){
+    const ap = ampmSel.value;
+    let h = parseInt(hourSel.value);
+    const m = parseInt(minSel.value);
+    if(ap==='오후' && h!==12) h += 12;
+    if(ap==='오전' && h===12) h = 0;
+    return `${pad(h)}:${pad(m)}`;
+  }
+
+  [ampmSel, hourSel, minSel].forEach(el => el.addEventListener('change', ()=>{ onChange(get24String(), getValue()); }));
+
+  return { el: wrap, getValue, get24String };
+}
+
+// ─────────────────────────────────────────────
+//  BUILD WEEK
+// ─────────────────────────────────────────────
+const today = new Date();
+const monday = getMonday(today);
+const weekDays = Array.from({length:5}, (_,i)=>{ const d=new Date(monday); d.setDate(monday.getDate()+i); return d; });
+
+function dayStatus(i){
+  const d = new Date(weekDays[i]); d.setHours(0,0,0,0);
+  const now = new Date(); now.setHours(0,0,0,0);
+  if(d < now) return 'past';
+  if(d.getTime()===now.getTime()) return 'today';
+  return 'future';
+}
+
+function buildHeader(){
+  const hdr = document.getElementById('week-header');
+  weekDays.forEach((d,i)=>{
+    const st = dayStatus(i);
+    const cell = document.createElement('div');
+    cell.className = `wgh-cell${st==='today'?' today-col':''}`;
+    const mo=d.getMonth()+1, da=d.getDate();
+    let inner = `<div class="day-name">${mo}월 ${da}일 (${DAYS_KO[d.getDay()]})</div>`;
+    if(st==='today') inner += `<div class="today-badge">오늘</div>`;
+    cell.innerHTML = inner;
+    hdr.appendChild(cell);
+  });
+}
+
+function buildRows(){
+  const data = loadData();
+  const container = document.getElementById('week-rows');
+  container.innerHTML = '';
+
+  const rowDefs = [
+    {key:'status', label:'출결구분'},
+    {key:'start',  label:'출근 시간'},
+    {key:'end',    label:'퇴근 시간'},
+    {key:'gross',  label:'총 근무'},
+    {key:'net',    label:'인정 근무'},
+  ];
+
+  rowDefs.forEach(row=>{
+    const tr = document.createElement('div');
+    tr.className = 'week-row';
+
+    const lbl = document.createElement('div');
+    lbl.className = 'row-label';
+    lbl.textContent = row.label;
+    tr.appendChild(lbl);
+
+    weekDays.forEach((d,i)=>{
+      const st = dayStatus(i);
+      const cell = document.createElement('div');
+      cell.className = `day-cell${st==='today'?' today-col':''}`;
+      const dayData = data[`day-${i}`] || {};
+
+      if(row.key==='status'){
+        if(st==='past')  cell.innerHTML=`<span class="status-pill pill-done">✓ 완료</span>`;
+        else if(st==='today') cell.innerHTML=`<span class="status-pill pill-today">● 근무 중</span>`;
+        else cell.innerHTML=`<span class="status-pill pill-plan">○ 예정</span>`;
+      }
+      else if(row.key==='start'){
+        if(st==='past'||st==='today'){
+          const picker = makeTimePicker(dayData.start||null, st==='today', (str, val)=>{
+            const d2 = loadData();
+            if(!d2[`day-${i}`]) d2[`day-${i}`]={};
+            d2[`day-${i}`].start = str;
+            saveData(d2);
+            refreshComputedCells(i);
+            updateStats();
+          });
+          cell.appendChild(picker.el);
+        } else {
+          cell.innerHTML=`<span class="dash-mark">—</span>`;
+        }
+      }
+      else if(row.key==='end'){
+        if(st==='past'||st==='today'){
+          const label = st==='today'?'예상':null;
+          const picker = makeTimePicker(dayData.end||null, st==='today', (str, val)=>{
+            const d2 = loadData();
+            if(!d2[`day-${i}`]) d2[`day-${i}`]={};
+            d2[`day-${i}`].end = str;
+            saveData(d2);
+            refreshComputedCells(i);
+            updateStats();
+          });
+          cell.appendChild(picker.el);
+        } else {
+          // Future: planned hours input
+          const wrap = document.createElement('div');
+          wrap.className = 'hrs-input-wrap';
+          const inp = document.createElement('input');
+          inp.type='number'; inp.min='0'; inp.max='24'; inp.step='0.5';
+          inp.className='hrs-input'; inp.placeholder='0';
+          if(dayData.planned!=null) inp.value=dayData.planned;
+          inp.addEventListener('change',()=>{
+            const d2=loadData();
+            if(!d2[`day-${i}`]) d2[`day-${i}`]={};
+            d2[`day-${i}`].planned = parseFloat(inp.value)||0;
+            saveData(d2);
+            refreshComputedCells(i);
+            updateStats();
+          });
+          const unit = document.createElement('span');
+          unit.className='hrs-unit'; unit.textContent='시간';
+          wrap.appendChild(inp); wrap.appendChild(unit);
+          cell.appendChild(wrap);
+        }
+      }
+      else if(row.key==='gross'){
+        const el = document.createElement('span');
+        el.id=`gross-${i}`; el.style.fontFamily="'JetBrains Mono',monospace";
+        el.textContent = grossDisplay(dayData,st);
+        cell.appendChild(el);
+      }
+      else if(row.key==='net'){
+        const el = document.createElement('span');
+        el.id=`net-${i}`; el.style.fontFamily="'JetBrains Mono',monospace";
+        el.style.color='var(--green)'; el.style.fontWeight='600';
+        el.textContent = netDisplay(dayData,st);
+        cell.appendChild(el);
+      }
+
+      tr.appendChild(cell);
+    });
+    container.appendChild(tr);
+  });
+
+  updateStats();
+}
+
+function grossDisplay(dd,st){
+  if(st==='future'){ const p=parseFloat(dd.planned); return isNaN(p)?'—':fmtHr(p); }
+  if(!dd.start||!dd.end) return '—';
+  const g = timeDecimal(dd.end)-timeDecimal(dd.start);
+  return g>0 ? fmtHr(g) : '—';
+}
+function netDisplay(dd,st){
+  if(st==='future'){ const p=parseFloat(dd.planned); return isNaN(p)?'—':fmtHr(netHrs(p)); }
+  if(!dd.start||!dd.end) return '—';
+  const g = timeDecimal(dd.end)-timeDecimal(dd.start);
+  return g>0 ? fmtHr(netHrs(g)) : '—';
+}
+function timeDecimal(str){
+  if(!str) return 0;
+  const [h,m]=str.split(':').map(Number); return h+m/60;
+}
+
+function refreshComputedCells(i){
+  const data=loadData(), dd=data[`day-${i}`]||{}, st=dayStatus(i);
+  const ge=document.getElementById(`gross-${i}`);
+  const ne=document.getElementById(`net-${i}`);
+  if(ge) ge.textContent=grossDisplay(dd,st);
+  if(ne) ne.textContent=netDisplay(dd,st);
+}
+
+// ─────────────────────────────────────────────
+//  STATS & PROGRESS
+// ─────────────────────────────────────────────
+function computeAll(){
+  const data=loadData();
+  let workedNet=0, workedBreak=0, plannedNet=0;
+  weekDays.forEach((_,i)=>{
+    const st=dayStatus(i), dd=data[`day-${i}`]||{};
+    if(st==='future'){
+      const p=parseFloat(dd.planned)||0; plannedNet+=netHrs(p);
+    } else {
+      if(dd.start&&dd.end){
+        const g=timeDecimal(dd.end)-timeDecimal(dd.start);
+        if(g>0){ workedNet+=netHrs(g); workedBreak+=calcBreak(g); }
+      }
+    }
+  });
+  return {workedNet,workedBreak,plannedNet};
+}
+
+function updateStats(){
+  const {workedNet,workedBreak,plannedNet}=computeAll();
+  const total=workedNet+plannedNet;
+  const pct=Math.min(100,(workedNet/TARGET)*100);
+  const pctIfPlan=Math.min(100,(total/TARGET)*100);
+  const remain=Math.max(0,TARGET-workedNet);
+
+  document.getElementById('st-worked').textContent=fmtHr(workedNet);
+  document.getElementById('st-remain').textContent=fmtHr(remain);
+  document.getElementById('st-break').textContent=fmtHr(workedBreak);
+  document.getElementById('st-pct').textContent=`${Math.round(pct)}%`;
+
+  document.getElementById('bar-fill').style.width=pct+'%';
+  document.getElementById('pct-badge').textContent=`${Math.round(pct)}%`;
+  document.getElementById('prog-mid').textContent=`${fmtHr(workedNet)} / 40h 완료`;
+
+  buildMarks([25,50,75]);
+  buildPredict(workedNet,plannedNet,total,pctIfPlan,remain);
+}
+
+function buildMarks(pcts){
+  const m=document.getElementById('bar-marks'); m.innerHTML='';
+  pcts.forEach(p=>{ const el=document.createElement('div'); el.className='bar-mark'; el.style.left=p+'%'; m.appendChild(el); });
+}
+
+function buildPredict(workedNet,plannedNet,total,pctIfPlan,remain){
+  const area=document.getElementById('predict-area');
+  if(workedNet>=TARGET){
+    area.innerHTML=`<div class="done-banner"><span class="done-icon">🏠</span><div><strong>완료! 이제 퇴근해도 됩니다!</strong><br/><span style="font-size:0.85rem;color:var(--text3)">주 40시간 목표 달성! 수고하셨어요 🎉</span></div></div>`;
+    return;
+  }
+  if(plannedNet>0){
+    const willDone=total>=TARGET;
+    const stillNeed=Math.max(0,TARGET-total);
+    area.innerHTML=`<div class="predict-banner">
+      <span class="predict-icon">${willDone?'🎯':'📊'}</span>
+      <div class="predict-text">
+        ${willDone
+          ?`예정대로 일하면 이번 주 <span class="highlight">총 ${fmtHr(total)}</span>이 채워져요! <strong style="color:var(--green)">목표 달성 ✓</strong>`
+          :`예정대로 일하면 이번 주 <span class="highlight">총 ${fmtHr(total)}</span>이 채워져요. <strong style="color:var(--pink)">${fmtHr(stillNeed)}</strong> 더 필요해요.`
+        }<br/>
+        <span style="font-size:0.82rem;color:var(--text2)">현재 실 근무 ${fmtHr(workedNet)} + 예정 ${fmtHr(plannedNet)} = ${Math.round(pctIfPlan)}% 달성 예상</span>
+      </div></div>`;
+  } else {
+    area.innerHTML=`<div class="predict-banner">
+      <span class="predict-icon">💡</span>
+      <div class="predict-text">
+        현재까지 <span class="highlight">${fmtHr(workedNet)}</span> 근무했어요.
+        목표까지 <strong>${fmtHr(remain)}</strong> 남았습니다.<br/>
+        <span style="font-size:0.82rem;color:var(--text2)">남은 날 예상 근무 시간을 입력하면 달성 여부를 알 수 있어요 👆</span>
+      </div></div>`;
+  }
+}
+
+// ─────────────────────────────────────────────
+//  BUTTONS
+// ─────────────────────────────────────────────
+document.getElementById('btn-calc').addEventListener('click',()=>{ updateStats(); showToast('✦ 계산 완료!'); });
+document.getElementById('btn-reset').addEventListener('click',()=>{
+  if(!confirm('이번 주 입력 내용을 모두 초기화할까요?')) return;
+  localStorage.removeItem(STORE_KEY); buildRows(); showToast('초기화되었습니다');
+});
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ─────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────
+buildHeader();
+buildRows();
+</script>
+</body>
+</html>
