@@ -224,6 +224,44 @@ body::before{
 .tp-ampm-lg.future-tp{background:rgba(124,92,252,0.1);border-color:rgba(124,92,252,0.4);color:#a688ff}
 .tp-sep-lg{color:var(--text2);font-family:'JetBrains Mono',monospace;font-size:1.1rem;margin:0 2px}
 
+/* ── MINUTE DRUM WHEEL ── */
+.min-drum{
+  position:relative;
+  border-radius:7px;
+  border:1px solid var(--border2);
+  background:rgba(255,255,255,0.07);
+  overflow:hidden;
+  cursor:ns-resize;
+  user-select:none;-webkit-user-select:none;
+  flex-shrink:0;
+}
+.min-drum.future-tp{border-color:rgba(124,92,252,0.4)}
+.min-drum-inner{
+  overflow-y:scroll;
+  scroll-snap-type:y mandatory;
+  scrollbar-width:none;-ms-overflow-style:none;
+  height:100%;
+}
+.min-drum-inner::-webkit-scrollbar{display:none}
+.min-drum-item{
+  display:flex;align-items:center;justify-content:center;
+  scroll-snap-align:start;
+  font-family:'JetBrains Mono',monospace;
+  font-weight:500;
+  color:var(--text3);
+  flex-shrink:0;
+  transition:color 0.15s;
+}
+.min-drum-item.active{color:var(--text1);font-weight:700}
+/* top/bottom fade to give depth illusion */
+.min-drum::before,.min-drum::after{
+  content:'';position:absolute;left:0;right:0;height:30%;pointer-events:none;z-index:2;
+}
+.min-drum::before{top:0;background:linear-gradient(to bottom,rgba(17,17,23,0.85),transparent)}
+.min-drum::after{bottom:0;background:linear-gradient(to top,rgba(17,17,23,0.85),transparent)}
+/* focus ring */
+.min-drum:focus-within{border-color:rgba(124,92,252,0.7);box-shadow:0 0 0 2px rgba(124,92,252,0.18)}
+
 /* ══ ACTION BAR ══ */
 .action-bar{
   background:var(--bg3);padding:0.85rem 1rem;
@@ -530,6 +568,100 @@ function dayStatus(i){
 }
 
 /* ═══════════════════════════════════════════
+   MINUTE DRUM WHEEL
+   Returns {el, getValue:()=>int}
+═══════════════════════════════════════════ */
+function makeMinDrum(initMin, lg, isFuture, onMinChange){
+  const itemH = lg ? 36 : 28;   // height of each item in px
+  const visibleItems = 3;        // how many items show at once
+  const containerH = itemH * visibleItems;
+  const TOTAL = 60;
+
+  const outer = document.createElement('div');
+  outer.className = 'min-drum' + (isFuture?' future-tp':'');
+  outer.style.cssText = `width:${lg?58:48}px;height:${containerH}px;`;
+
+  const inner = document.createElement('div');
+  inner.className = 'min-drum-inner';
+  inner.style.cssText = `height:${containerH}px;`;
+  outer.appendChild(inner);
+
+  // Padding items top + bottom so first/last value can center
+  const padCount = Math.floor(visibleItems/2); // 1
+
+  // Add top pads
+  for(let p=0;p<padCount;p++){
+    const ghost=document.createElement('div');
+    ghost.className='min-drum-item';
+    ghost.style.cssText=`height:${itemH}px;font-size:${lg?'0.92':'0.78'}rem;opacity:0`;
+    ghost.textContent='00'; inner.appendChild(ghost);
+  }
+
+  // Add 00–59 items
+  let currentMin = initMin;
+  for(let i=0;i<TOTAL;i++){
+    const item=document.createElement('div');
+    item.className='min-drum-item'+(i===initMin?' active':'');
+    item.style.cssText=`height:${itemH}px;font-size:${lg?'0.92':'0.78'}rem;`;
+    item.textContent=pad(i);
+    item.dataset.val=i;
+    inner.appendChild(item);
+  }
+
+  // Add bottom pads
+  for(let p=0;p<padCount;p++){
+    const ghost=document.createElement('div');
+    ghost.className='min-drum-item';
+    ghost.style.cssText=`height:${itemH}px;font-size:${lg?'0.92':'0.78'}rem;opacity:0`;
+    ghost.textContent='00'; inner.appendChild(ghost);
+  }
+
+  // Scroll to initial position (offset by pad)
+  // Each real item index i is at scroll position i * itemH
+  inner.scrollTop = initMin * itemH;
+
+  // Update active highlight
+  function updateActive(val){
+    inner.querySelectorAll('.min-drum-item[data-val]').forEach(el=>{
+      el.classList.toggle('active', parseInt(el.dataset.val)===val);
+    });
+  }
+
+  // On scroll end, snap and fire
+  let scrollTimer;
+  inner.addEventListener('scroll', ()=>{
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(()=>{
+      const rawIdx = Math.round(inner.scrollTop / itemH);
+      const clamped = Math.max(0, Math.min(TOTAL-1, rawIdx));
+      inner.scrollTo({top: clamped * itemH, behavior:'smooth'});
+      currentMin = clamped;
+      updateActive(clamped);
+      onMinChange(clamped);
+    }, 80);
+  });
+
+  // Mouse wheel support (prevent page scroll when inside drum)
+  outer.addEventListener('wheel', (e)=>{
+    e.preventDefault();
+    inner.scrollTop += e.deltaY > 0 ? itemH : -itemH;
+  }, {passive:false});
+
+  // Click on item to select
+  inner.addEventListener('click', (e)=>{
+    const item = e.target.closest('[data-val]');
+    if(!item) return;
+    const val = parseInt(item.dataset.val);
+    inner.scrollTo({top: val * itemH, behavior:'smooth'});
+    currentMin = val;
+    updateActive(val);
+    onMinChange(val);
+  });
+
+  return { el: outer, getValue: ()=>currentMin };
+}
+
+/* ═══════════════════════════════════════════
    TIME PICKER FACTORY
    size: 'sm' (desktop) | 'lg' (mobile)
    type: 'past'|'today'|'future'
@@ -542,15 +674,19 @@ function makeTimePicker(savedVal, type, size, onChange){
   const selCls  = lg ? 'tp-sel-lg' : 'tp-sel';
   const ampmCls = lg ? 'tp-ampm-lg' : 'tp-ampm';
   const sepCls  = lg ? 'tp-sep-lg' : 'tp-sep';
-  const futureMod = type==='future' ? ' future-tp' : '';
+  const isFuture = type==='future';
+  const futureMod = isFuture ? ' future-tp' : '';
 
   const wrap = document.createElement('div');
   wrap.className = 'time-picker';
+  wrap.style.alignItems = 'center';
 
+  // 오전/오후
   const ampmSel = document.createElement('select');
   ampmSel.className = `${selCls} ${ampmCls}${futureMod}`;
   ['오전','오후'].forEach(v=>{ const o=document.createElement('option');o.value=v;o.textContent=v;ampmSel.appendChild(o); });
 
+  // Hour
   const hourSel = document.createElement('select');
   hourSel.className = `${selCls}${futureMod}`;
   hourSel.style.width = lg?'58px':'50px';
@@ -559,26 +695,25 @@ function makeTimePicker(savedVal, type, size, onChange){
   const sep = document.createElement('span');
   sep.className=sepCls; sep.textContent=':';
 
-  const minSel = document.createElement('select');
-  minSel.className = `${selCls}${futureMod}`;
-  minSel.style.width = lg?'58px':'50px';
-  for(let i=0;i<60;i+=10){ const o=document.createElement('option');o.value=i;o.textContent=pad(i);minSel.appendChild(o); }
+  // Minute DRUM
+  const drum = makeMinDrum(initM, lg, isFuture, (newMin)=>{
+    fireChange();
+  });
 
-  // Set initial
+  // Set initial selects
   ampmSel.value = initH24>=12?'오후':'오전';
   let h12=initH24%12; if(h12===0)h12=12; hourSel.value=h12;
-  minSel.value = Math.round(initM/10)*10%60;
 
-  wrap.append(ampmSel, hourSel, sep, minSel);
+  wrap.append(ampmSel, hourSel, sep, drum.el);
 
-  function get24(){
-    let h=parseInt(hourSel.value), m=parseInt(minSel.value);
+  function fireChange(){
+    let h=parseInt(hourSel.value), m=drum.getValue();
     if(ampmSel.value==='오후'&&h!==12) h+=12;
     if(ampmSel.value==='오전'&&h===12) h=0;
-    return `${pad(h)}:${pad(m)}`;
+    onChange(`${pad(h)}:${pad(m)}`);
   }
 
-  [ampmSel,hourSel,minSel].forEach(el=>el.addEventListener('change',()=>onChange(get24())));
+  [ampmSel, hourSel].forEach(el=>el.addEventListener('change', fireChange));
   return wrap;
 }
 
