@@ -340,6 +340,26 @@ body::before{
 
 footer{text-align:center;color:var(--text2);font-size:0.78rem;padding-top:2rem}
 
+/* ── TOP CREDIT BAR ── */
+.credit-bar{
+  position:fixed;top:0;left:0;right:0;z-index:999;
+  background:rgba(11,11,15,0.85);backdrop-filter:blur(12px);
+  border-bottom:1px solid rgba(124,92,252,0.25);
+  padding:0.4rem 1.2rem;
+  display:flex;align-items:center;justify-content:center;gap:0.5rem;
+  font-size:0.75rem;color:var(--text2);
+  animation:fadeDown 0.8s ease 0.3s both;
+}
+.credit-bar .credit-name{color:#a688ff;font-weight:700}
+.credit-bar .credit-role{color:var(--text3)}
+.credit-bar .credit-disclaimer{
+  color:var(--text2);font-size:0.7rem;
+  background:rgba(255,255,255,0.06);border:1px solid var(--border);
+  padding:0.12rem 0.55rem;border-radius:50px;
+}
+/* push app content down so it's not behind fixed bar */
+.app{padding-top:3.5rem}
+
 /* ══════════════════════════════════════════
    RESPONSIVE BREAKPOINTS
 ══════════════════════════════════════════ */
@@ -371,6 +391,14 @@ footer{text-align:center;color:var(--text2);font-size:0.78rem;padding-top:2rem}
 </style>
 </head>
 <body>
+<!-- TOP CREDIT BAR -->
+<div class="credit-bar">
+  <span>By</span>
+  <span class="credit-name">이윤재</span>
+  <span class="credit-role">AI PM 인턴</span>
+  <span class="credit-disclaimer">😇 업무시간에 만든거 아님</span>
+</div>
+
 <div class="glow-a"></div>
 <div class="glow-b"></div>
 
