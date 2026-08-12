@@ -236,6 +236,19 @@ body::before{
 .min-dial-wrap:active{cursor:grabbing}
 .min-dial-wrap canvas{display:block;border-radius:50%;}
 
+/* ── TIME PICKER WRAPPER (outer flex column) ── */
+.tp-outer{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+}
+/* 24h conversion label */
+.tp-conv{
+  font-size:0.65rem;color:var(--text2);font-family:'JetBrains Mono',monospace;
+  letter-spacing:0.04em;white-space:nowrap;text-align:center;
+  transition:color 0.2s;
+}
+.tp-conv.am{color:#00d4ff}
+.tp-conv.pm{color:#ff4d8d}
+
 /* ══ ACTION BAR ══ */
 .action-bar{
   background:var(--bg3);padding:0.85rem 1rem;
@@ -692,59 +705,75 @@ function makeMinDial(initMin, lg, isFuture, onMinChange){
 }
 
 /* ═══════════════════════════════════════════
-   TIME PICKER FACTORY
-   size: 'sm' (desktop) | 'lg' (mobile)
-   type: 'past'|'today'|'future'
+   TIME PICKER FACTORY  (24h military time)
+   size: 'sm' | 'lg'   type: 'past'|'today'|'future'
 ═══════════════════════════════════════════ */
 function makeTimePicker(savedVal, type, size, onChange){
   let initH24=9, initM=0;
   if(savedVal){ const p=savedVal.split(':').map(Number); initH24=p[0]; initM=p[1]; }
 
   const lg = size==='lg';
-  const selCls  = lg ? 'tp-sel-lg' : 'tp-sel';
-  const ampmCls = lg ? 'tp-ampm-lg' : 'tp-ampm';
-  const sepCls  = lg ? 'tp-sep-lg' : 'tp-sep';
+  const selCls = lg ? 'tp-sel-lg' : 'tp-sel';
+  const sepCls = lg ? 'tp-sep-lg' : 'tp-sep';
   const isFuture = type==='future';
   const futureMod = isFuture ? ' future-tp' : '';
 
+  /* outer column: [row of selects] + [conversion label] */
+  const outer = document.createElement('div');
+  outer.className = 'tp-outer';
+
+  /* inner row: hour : dial */
   const wrap = document.createElement('div');
   wrap.className = 'time-picker';
   wrap.style.alignItems = 'center';
 
-  // 오전/오후
-  const ampmSel = document.createElement('select');
-  ampmSel.className = `${selCls} ${ampmCls}${futureMod}`;
-  ['오전','오후'].forEach(v=>{ const o=document.createElement('option');o.value=v;o.textContent=v;ampmSel.appendChild(o); });
-
-  // Hour
+  // Hour select 00–23
   const hourSel = document.createElement('select');
   hourSel.className = `${selCls}${futureMod}`;
-  hourSel.style.width = lg?'58px':'50px';
-  for(let i=1;i<=12;i++){ const o=document.createElement('option');o.value=i;o.textContent=pad(i);hourSel.appendChild(o); }
+  hourSel.style.width = lg ? '62px' : '52px';
+  for(let i=0;i<24;i++){
+    const o=document.createElement('option');
+    o.value=i; o.textContent=pad(i); hourSel.appendChild(o);
+  }
+  hourSel.value = initH24;
 
   const sep = document.createElement('span');
-  sep.className=sepCls; sep.textContent=':';
+  sep.className = sepCls; sep.textContent = ':';
 
-  // Minute DIAL
-  const drum = makeMinDial(initM, lg, isFuture, (newMin)=>{
-    fireChange();
-  });
+  // Minute rotary dial
+  const dial = makeMinDial(initM, lg, isFuture, ()=>{ fireChange(); });
 
-  // Set initial selects
-  ampmSel.value = initH24>=12?'오후':'오전';
-  let h12=initH24%12; if(h12===0)h12=12; hourSel.value=h12;
+  wrap.append(hourSel, sep, dial.el);
 
-  wrap.append(ampmSel, hourSel, sep, drum.el);
+  // 오전/오후 conversion label
+  const convLbl = document.createElement('div');
+  convLbl.className = 'tp-conv';
+
+  function to12h(h24, m){
+    const ampm = h24 < 12 ? '오전' : '오후';
+    const h12  = h24 % 12 || 12;
+    return `${ampm} ${pad(h12)}:${pad(m)}`;
+  }
+
+  function updateLabel(){
+    const h = parseInt(hourSel.value);
+    const m = dial.getValue();
+    convLbl.textContent = to12h(h, m);
+    convLbl.className = `tp-conv ${h < 12 ? 'am' : 'pm'}`;
+  }
 
   function fireChange(){
-    let h=parseInt(hourSel.value), m=drum.getValue();
-    if(ampmSel.value==='오후'&&h!==12) h+=12;
-    if(ampmSel.value==='오전'&&h===12) h=0;
+    const h = parseInt(hourSel.value);
+    const m = dial.getValue();
+    updateLabel();
     onChange(`${pad(h)}:${pad(m)}`);
   }
 
-  [ampmSel, hourSel].forEach(el=>el.addEventListener('change', fireChange));
-  return wrap;
+  hourSel.addEventListener('change', fireChange);
+  updateLabel(); // initial label
+
+  outer.append(wrap, convLbl);
+  return outer;
 }
 
 /* ═══════════════════════════════════════════
