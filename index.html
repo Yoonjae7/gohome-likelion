@@ -346,12 +346,11 @@ function makeTimePicker(savedVal, type, size, role, onChange){
   const minSel = document.createElement('select');
   minSel.className = selCls + fm;
   minSel.style.width = w;
-  for(let i=0; i<60; i+=5){
+  for(let i=0; i<60; i++){
     const o = document.createElement('option');
     o.value = i; o.textContent = pad(i); minSel.appendChild(o);
   }
-  const snapped = Math.round(initM / 5) * 5 % 60;
-  minSel.value = snapped;
+  minSel.value = initM;
 
   function fire(){ onChange(`${pad(parseInt(hourSel.value))}:${pad(parseInt(minSel.value))}`); }
   hourSel.addEventListener('change', fire);
