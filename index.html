@@ -72,37 +72,6 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .tp-sel.future-tp{border-color:rgba(124,92,252,0.3)}
 .tp-sel.future-tp:focus{border-color:rgba(124,92,252,0.65)}
 
-/* MINUTE SPINNER */
-.min-spin{
-  position:relative;
-  display:inline-flex;flex-direction:column;align-items:center;
-  background:rgba(255,255,255,0.06);border:1px solid var(--border2);
-  border-radius:6px;overflow:hidden;cursor:ns-resize;
-  user-select:none;-webkit-user-select:none;
-  touch-action:none;
-  transition:border-color 0.12s,background 0.12s;
-}
-.min-spin:hover{background:rgba(255,255,255,0.09)}
-.min-spin.focused{border-color:rgba(124,92,252,0.6);box-shadow:0 0 0 2px rgba(124,92,252,0.12);background:rgba(124,92,252,0.06)}
-.min-spin.future-tp{border-color:rgba(124,92,252,0.3)}
-.min-spin-btn{
-  width:100%;display:flex;align-items:center;justify-content:center;
-  color:var(--text2);font-size:0.5rem;line-height:1;
-  padding:0.12rem 0;transition:color 0.1s,background 0.1s;
-  cursor:pointer;
-}
-.min-spin-btn:hover{color:var(--text1);background:rgba(255,255,255,0.06)}
-.min-spin-val{
-  font-family:'JetBrains Mono',monospace;font-weight:500;color:var(--text1);
-  padding:0.05rem 0.15rem;line-height:1;
-  pointer-events:none;
-}
-.min-spin-lg{
-  border-radius:8px;
-}
-.min-spin-lg .min-spin-btn{font-size:0.6rem;padding:0.14rem 0}
-
-
 /* STATUS PILLS */
 .status-pill{display:inline-flex;align-items:center;gap:0.22rem;font-size:0.64rem;font-weight:700;padding:0.16rem 0.5rem;border-radius:50px;letter-spacing:0.04em;white-space:nowrap;}
 .pill-done{background:rgba(0,229,160,0.1);border:1px solid rgba(0,229,160,0.3);color:var(--green)}
@@ -342,68 +311,6 @@ function dayStatus(i){
 const START_HOURS = [8, 9, 10];
 const END_HOURS   = [16,17,18,19,20,21,22,23];
 
-// MINUTE SPINNER — scroll wheel / swipe to change
-function makeMinSpinner(initM, isFuture, lg, onMinChange){
-  const fm = isFuture ? ' future-tp' : '';
-  let val = Math.max(0, Math.min(59, initM));
-
-  const wrap = document.createElement('div');
-  wrap.className = 'min-spin' + (lg ? ' min-spin-lg' : '') + fm;
-  wrap.style.width = lg ? '60px' : '46px';
-
-  const btnUp = document.createElement('div');
-  btnUp.className = 'min-spin-btn'; btnUp.textContent = '▲';
-
-  const valEl = document.createElement('div');
-  valEl.className = 'min-spin-val';
-  valEl.style.fontSize = lg ? '0.86rem' : '0.74rem';
-  valEl.textContent = pad(val);
-
-  const btnDn = document.createElement('div');
-  btnDn.className = 'min-spin-btn'; btnDn.textContent = '▼';
-
-  function set(v){
-    val = ((v % 60) + 60) % 60;
-    valEl.textContent = pad(val);
-    onMinChange(val);
-  }
-
-  btnUp.addEventListener('click', () => set(val - 1));
-  btnDn.addEventListener('click', () => set(val + 1));
-
-  // Mouse wheel
-  wrap.addEventListener('wheel', e => {
-    e.preventDefault();
-    set(val + (e.deltaY > 0 ? 1 : -1));
-  }, {passive: false});
-
-  // Touch drag (swipe up = increase, swipe down = decrease)
-  let touchStartY = null;
-  wrap.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, {passive:true});
-  wrap.addEventListener('touchmove', e => {
-    if(touchStartY == null) return;
-    e.preventDefault();
-    const dy = touchStartY - e.touches[0].clientY;
-    if(Math.abs(dy) >= 12){
-      set(val + (dy > 0 ? 1 : -1));
-      touchStartY = e.touches[0].clientY;
-    }
-  }, {passive: false});
-  wrap.addEventListener('touchend', () => { touchStartY = null; });
-
-  // Focus styling
-  wrap.setAttribute('tabindex', '0');
-  wrap.addEventListener('focus', () => wrap.classList.add('focused'));
-  wrap.addEventListener('blur',  () => wrap.classList.remove('focused'));
-  wrap.addEventListener('keydown', e => {
-    if(e.key === 'ArrowUp')   { e.preventDefault(); set(val - 1); }
-    if(e.key === 'ArrowDown') { e.preventDefault(); set(val + 1); }
-  });
-
-  wrap.append(btnUp, valEl, btnDn);
-  return { el: wrap, getValue: () => val };
-}
-
 function makeTimePicker(savedVal, type, size, role, onChange){
   const hours = role === 'start' ? START_HOURS : END_HOURS;
   const defaultH = hours[0];
@@ -436,14 +343,20 @@ function makeTimePicker(savedVal, type, size, role, onChange){
   const sep = document.createElement('span');
   sep.className = sepCls; sep.textContent = ':';
 
-  const minSpinner = makeMinSpinner(initM, isFuture, lg, () => fire());
-
-  function fire(){
-    onChange(`${pad(parseInt(hourSel.value))}:${pad(minSpinner.getValue())}`);
+  const minSel = document.createElement('select');
+  minSel.className = selCls + fm;
+  minSel.style.width = w;
+  for(let i = 0; i < 60; i++){
+    const o = document.createElement('option');
+    o.value = i; o.textContent = pad(i); minSel.appendChild(o);
   }
-  hourSel.addEventListener('change', fire);
+  minSel.value = initM;
 
-  wrap.append(hourSel, sep, minSpinner.el);
+  function fire(){ onChange(`${pad(parseInt(hourSel.value))}:${pad(parseInt(minSel.value))}`); }
+  hourSel.addEventListener('change', fire);
+  minSel.addEventListener('change', fire);
+
+  wrap.append(hourSel, sep, minSel);
   return wrap;
 }
 
