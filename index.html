@@ -44,7 +44,12 @@ body{
 }
 
 /* ══ APP CONTAINER ══ */
-.app{width:100%;max-width:480px;padding:0 1rem 3rem;position:relative}
+.app{width:100%;max-width:960px;padding:0 1rem 3rem;position:relative}
+
+/* ══ MAIN LAYOUT ══ */
+.main-content{display:flex;gap:1.5rem;align-items:flex-start}
+.main-left{flex:1;min-width:0}
+.main-right{width:320px;flex-shrink:0;position:sticky;top:1rem}
 
 /* ══ HEADER ══ */
 .header{
@@ -197,7 +202,7 @@ body{
 /* ══ WEEKLY SUMMARY ══ */
 .summary{
   background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);
-  padding:1.3rem 1.2rem;margin-top:1.2rem;
+  padding:1.3rem 1.2rem;margin-top:0;
   box-shadow:var(--shadow);
   animation:fadeUp 0.5s ease 0.2s both;
 }
@@ -271,6 +276,9 @@ body{
 }
 .badge-32.show{display:inline-flex}
 @keyframes badgePop{from{opacity:0;transform:scale(0.7)}to{opacity:1;transform:scale(1)}}
+.badge-32.badge-blue{background:linear-gradient(135deg,#e8f0fe,#dbeafe);border-color:rgba(59,130,246,0.2);color:var(--blue)}
+.badge-32.badge-gold{background:linear-gradient(135deg,#fef3c7,#fde68a);border-color:rgba(217,180,45,0.2);color:#b45309}
+.badge-32.badge-purple{background:linear-gradient(135deg,#e8e0ff,#ddd6fe);border-color:rgba(108,76,224,0.2);color:var(--accent)}
 
 .prog-legend{
   display:flex;align-items:center;justify-content:space-between;
@@ -331,6 +339,15 @@ body{
 footer{text-align:center;color:var(--text3);font-size:0.7rem;margin-top:1.5rem;padding-bottom:1rem}
 
 /* ══ RESPONSIVE ══ */
+@media(min-width:769px){
+  .carousel-wrap{margin:0;padding:0 1rem}
+}
+@media(max-width:768px){
+  .app{max-width:480px}
+  .main-content{flex-direction:column}
+  .main-right{width:100%;position:static}
+  .summary{margin-top:1.2rem}
+}
 @media(min-width:520px){
   .logo-img{height:160px}
   .header h1{font-size:1.8rem}
@@ -370,44 +387,50 @@ footer{text-align:center;color:var(--text3);font-size:0.7rem;margin-top:1.5rem;p
     </div>
   </header>
 
-  <!-- DAY NAV DOTS -->
-  <nav class="day-nav" id="day-nav"></nav>
+  <div class="main-content">
+    <div class="main-left">
+      <!-- DAY NAV DOTS -->
+      <nav class="day-nav" id="day-nav"></nav>
 
-  <!-- CAROUSEL -->
-  <div class="carousel-wrap">
-    <div class="nav-arrow left" id="nav-left">‹</div>
-    <div class="nav-arrow right" id="nav-right">›</div>
-    <div class="carousel-track" id="carousel-track"></div>
-  </div>
-
-  <!-- WEEKLY SUMMARY -->
-  <div class="summary">
-    <div class="summary-title">📊 주간 요약</div>
-    <div class="summary-grid">
-      <div class="sg-item"><div class="sg-label">실 근무</div><div class="sg-val v-accent" id="st-worked">0h</div></div>
-      <div class="sg-item"><div class="sg-label">실근무 + 예상</div><div class="sg-val v-blue" id="st-total-plan">0h</div></div>
-      <div class="sg-item"><div class="sg-label">남은 시간</div><div class="sg-val v-pink" id="st-remain">40h</div></div>
-      <div class="sg-item"><div class="sg-label">차감 휴게</div><div class="sg-val v-green" id="st-break">0h</div></div>
-      <div class="sg-item"><div class="sg-label">달성률 (실근무)</div><div class="sg-val v-blue" id="st-pct">0%</div></div>
-      <div class="sg-item"><div class="sg-label">달성률 (+ 예상)</div><div class="sg-val v-blue" id="st-pct-plan">0%</div></div>
-    </div>
-    <div class="prog-bar">
-      <div class="prog-plan" id="prog-plan"></div>
-      <div class="prog-actual" id="prog-actual"></div>
-      <div class="prog-marker-32"></div>
-    </div>
-    <div class="prog-legend">
-      <div class="prog-legend-left">
-        <span class="pl-item"><span class="pl-dot actual"></span><span id="leg-a">0h</span> 실근무</span>
-        <span class="pl-item"><span class="pl-dot planned"></span><span id="leg-p">—</span> 예상</span>
-      </div>
-      <div class="prog-totals">
-        <div class="pt-row"><span class="pt-label">40h 기준</span> <span class="pt-val" id="leg-total-40">0h / 40h</span></div>
-        <div class="pt-row"><span class="pt-label">32h 기준</span> <span class="pt-val" id="leg-total-32">0h / 32h</span></div>
+      <!-- CAROUSEL -->
+      <div class="carousel-wrap">
+        <div class="nav-arrow left" id="nav-left">‹</div>
+        <div class="nav-arrow right" id="nav-right">›</div>
+        <div class="carousel-track" id="carousel-track"></div>
       </div>
     </div>
-    <div class="badge-32" id="badge-32">🔥 32시간 달성!</div>
-    <div id="predict-area"></div>
+
+    <div class="main-right">
+      <!-- WEEKLY SUMMARY -->
+      <div class="summary">
+        <div class="summary-title">📊 주간 요약</div>
+        <div class="summary-grid">
+          <div class="sg-item"><div class="sg-label">실 근무</div><div class="sg-val v-accent" id="st-worked">0h</div></div>
+          <div class="sg-item"><div class="sg-label">실근무 + 예상</div><div class="sg-val v-blue" id="st-total-plan">0h</div></div>
+          <div class="sg-item"><div class="sg-label">남은 시간</div><div class="sg-val v-pink" id="st-remain">40h</div></div>
+          <div class="sg-item"><div class="sg-label">차감 휴게</div><div class="sg-val v-green" id="st-break">0h</div></div>
+          <div class="sg-item"><div class="sg-label">달성률 (실근무)</div><div class="sg-val v-blue" id="st-pct">0%</div></div>
+          <div class="sg-item"><div class="sg-label">달성률 (+ 예상)</div><div class="sg-val v-blue" id="st-pct-plan">0%</div></div>
+        </div>
+        <div class="prog-bar">
+          <div class="prog-plan" id="prog-plan"></div>
+          <div class="prog-actual" id="prog-actual"></div>
+          <div class="prog-marker-32"></div>
+        </div>
+        <div class="prog-legend">
+          <div class="prog-legend-left">
+            <span class="pl-item"><span class="pl-dot actual"></span><span id="leg-a">0h</span> 실근무</span>
+            <span class="pl-item"><span class="pl-dot planned"></span><span id="leg-p">—</span> 예상</span>
+          </div>
+          <div class="prog-totals">
+            <div class="pt-row"><span class="pt-label">40h 기준</span> <span class="pt-val" id="leg-total-40">0h / 40h</span></div>
+            <div class="pt-row"><span class="pt-label">32h 기준</span> <span class="pt-val" id="leg-total-32">0h / 32h</span></div>
+          </div>
+        </div>
+        <div class="badge-32" id="badge-32">🔥 32시간 달성!</div>
+        <div id="predict-area"></div>
+      </div>
+    </div>
   </div>
 
   <div class="reset-row">
@@ -667,17 +690,23 @@ function updateStats(){
   document.getElementById('prog-plan').style.width=pctPlan+'%';
   document.getElementById('leg-a').textContent=fmtHr(workedNet);
   document.getElementById('leg-p').textContent=plannedNet>0?fmtHr(plannedNet):'—';
-  document.getElementById('leg-total-40').textContent=`${fmtHr(workedNet)} / 40h`;
-  document.getElementById('leg-total-32').textContent=`${fmtHr(workedNet)} / 32h`;
+  document.getElementById('leg-total-40').textContent=`${fmtHr(total)} / 40h`;
+  document.getElementById('leg-total-32').textContent=`${fmtHr(total)} / 32h`;
 
-  // 32h badge: show if actual work >= 32 or actual+planned >= 32
+  // Milestone badge - show only the HIGHEST achieved milestone
   const badge32=document.getElementById('badge-32');
-  if(workedNet>=TARGET32){
+  if(workedNet>=TARGET){
+    badge32.className='badge-32 show badge-gold';
+    badge32.innerHTML='🏆 실근무 40시간 달성!';
+  } else if(total>=TARGET){
+    badge32.className='badge-32 show badge-blue';
+    badge32.innerHTML='🎯 실근무 + 예상시 40시간 달성!';
+  } else if(workedNet>=TARGET32){
     badge32.className='badge-32 show';
-    badge32.innerHTML='🔥 32시간 달성! (실근무)';
+    badge32.innerHTML='🔥 실근무 32시간 달성!';
   } else if(total>=TARGET32){
-    badge32.className='badge-32 show';
-    badge32.innerHTML='🎯 32시간 달성! (실근무 + 예상)';
+    badge32.className='badge-32 show badge-purple';
+    badge32.innerHTML='✨ 실근무 + 예상시 32시간 달성!';
   } else {
     badge32.className='badge-32';
   }
