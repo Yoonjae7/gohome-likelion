@@ -508,18 +508,57 @@ function tick(){
 }
 tick();setInterval(tick,1000);
 
-/* ═══════════ WEEK ═══════════ */
-const monday=getMonday(new Date());
-const weekDays=Array.from({length:5},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()+i);return d;});
+/* ═══════════ WEEK (live-updating) ═══════════ */
+let monday=getMonday(new Date());
+let weekDays=Array.from({length:5},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()+i);return d;});
+let currentIndex=0;
+
+function recalcWeek(){
+  monday=getMonday(new Date());
+  weekDays=Array.from({length:5},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()+i);return d;});
+  currentIndex=0;
+  weekDays.forEach((d,i)=>{if(dayStatus(i)==='today')currentIndex=i;});
+}
+
 function dayStatus(i){
   const d=new Date(weekDays[i]);d.setHours(0,0,0,0);
   const now=new Date();now.setHours(0,0,0,0);
   if(d<now)return'past';if(d.getTime()===now.getTime())return'today';return'future';
 }
 
-/* find today's index */
-let currentIndex=0;
+/* find today's index on first load */
 weekDays.forEach((d,i)=>{if(dayStatus(i)==='today')currentIndex=i;});
+
+/* ═══════════ AUTO-REFRESH ═══════════ */
+/* Track the current date so we detect day changes (midnight, sleep/wake, etc.) */
+let _lastDateStr=(()=>{const n=new Date();return `${n.getFullYear()}-${n.getMonth()}-${n.getDate()}`;})();
+
+function fullRefresh(){
+  recalcWeek();
+  buildDots();
+  buildCarousel();
+  updateStats();
+}
+
+function checkDateChange(){
+  const n=new Date(), ds=`${n.getFullYear()}-${n.getMonth()}-${n.getDate()}`;
+  if(ds!==_lastDateStr){
+    _lastDateStr=ds;
+    fullRefresh();
+  }
+}
+
+/* Check every 30 seconds if the date has changed */
+setInterval(checkDateChange,30000);
+
+/* Also refresh when the tab becomes visible again (coming back after sleep, etc.) */
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden){
+    tick(); /* update clock immediately */
+    checkDateChange(); /* check if day rolled over */
+    updateStats(); /* recalc stats in case anything is stale */
+  }
+});
 
 /* ═══════════ TIME PICKER ═══════════ */
 const START_HOURS=[8,9,10], END_HOURS=[16,17,18,19,20,21,22,23];
