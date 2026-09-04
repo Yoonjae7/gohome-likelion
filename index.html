@@ -342,18 +342,25 @@ body{
 .dc-day-reset:hover{background:var(--pink-bg);color:var(--pink);border-color:var(--pink)}
 .dc-day-reset:active{transform:scale(0.95)}
 
-/* business trip button */
-.dc-actions{display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.5rem}
+/* business trip toggle */
+.dc-top-actions{display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:1rem}
 .btn-biz-trip{
-  display:inline-flex;align-items:center;gap:0.25rem;
-  padding:0.35rem 0.8rem;
+  display:inline-flex;align-items:center;gap:0.35rem;
+  padding:0.45rem 0.9rem;
   border:1.5px solid var(--blue);border-radius:50px;
   background:var(--blue-bg);color:var(--blue);font-family:'Outfit',sans-serif;
-  font-size:0.68rem;font-weight:700;cursor:pointer;
-  transition:all 0.2s;-webkit-tap-highlight-color:transparent;
+  font-size:0.72rem;font-weight:700;cursor:pointer;
+  transition:all 0.25s cubic-bezier(0.4,0,0.2,1);-webkit-tap-highlight-color:transparent;
 }
 .btn-biz-trip:hover{background:var(--blue);color:#fff;}
 .btn-biz-trip:active{transform:scale(0.95)}
+.btn-biz-trip.active{
+  background:var(--blue);color:#fff;
+  box-shadow:0 2px 10px rgba(59,130,246,0.35);
+}
+
+/* disabled fields when biz trip is on */
+.dc-fields.disabled{opacity:0.45;pointer-events:none;filter:grayscale(0.3)}
 
 /* friday early-leave info */
 .fri-leave-info{
@@ -665,6 +672,7 @@ function buildCarousel(){
     else if(st==='today'){statusTxt='● 오늘';}
     else{statusTxt='○ 예정';}
 
+    const isBizTrip=!!dd.bizTrip;
     card.innerHTML=`
       <div class="day-card-inner">
         <div class="dc-header">
@@ -674,7 +682,10 @@ function buildCarousel(){
           </div>
           <span class="dc-status ${statusCls}">${statusTxt}</span>
         </div>
-        <div class="dc-fields" id="fields-${i}">
+        <div class="dc-top-actions">
+          <button class="btn-biz-trip${isBizTrip?' active':''}" id="biz-btn-${i}" onclick="toggleBusinessTrip(${i})">${isBizTrip?'✅ 출장/외근 (9-18)':'📋 출장/외근'}</button>
+        </div>
+        <div class="dc-fields${isBizTrip?' disabled':''}" id="fields-${i}">
           <div class="dc-field">
             <label class="dc-label">출근 시간</label>
             <div id="start-sel-${i}"></div>
@@ -688,10 +699,7 @@ function buildCarousel(){
             <span class="dc-result-val" id="result-${i}">${net?fmtHr(net):'—'}</span>
           </div>
           <div id="fri-info-${i}"></div>
-          <div class="dc-actions">
-            <button class="btn-biz-trip" onclick="setBusinessTrip(${i})">📋 출장/외근</button>
-            <button class="dc-day-reset" onclick="resetDay(${i})">↺ 이 날 초기화</button>
-          </div>
+          <button class="dc-day-reset" onclick="resetDay(${i})">↺ 이 날 초기화</button>
         </div>
       </div>`;
 
@@ -882,21 +890,30 @@ function resetDay(i){
   showToast(`${dayNames[i]} 초기화 완료`);
 }
 
-/* ═══════════ BUSINESS TRIP (출장/외근) ═══════════ */
-function setBusinessTrip(i){
+/* ═══════════ BUSINESS TRIP TOGGLE (출장/외근) ═══════════ */
+function toggleBusinessTrip(i){
   const data=loadData();
   const st=dayStatus(i);
   if(!data[`day-${i}`])data[`day-${i}`]={};
-  if(st==='future'){
-    data[`day-${i}`].fstart='09:00';
-    data[`day-${i}`].fend='18:00';
+  const isOn=!!data[`day-${i}`].bizTrip;
+
+  if(isOn){
+    // Toggle OFF — clear biz trip data
+    delete data[`day-${i}`].bizTrip;
+    if(st==='future'){delete data[`day-${i}`].fstart;delete data[`day-${i}`].fend;}
+    else{delete data[`day-${i}`].start;delete data[`day-${i}`].end;}
+    saveData(data);
+    buildCarousel();updateStats();
+    showToast(`${DAYS_FULL[i]} 출장/외근 해제`);
   } else {
-    data[`day-${i}`].start='09:00';
-    data[`day-${i}`].end='18:00';
+    // Toggle ON — set 9-18
+    data[`day-${i}`].bizTrip=true;
+    if(st==='future'){data[`day-${i}`].fstart='09:00';data[`day-${i}`].fend='18:00';}
+    else{data[`day-${i}`].start='09:00';data[`day-${i}`].end='18:00';}
+    saveData(data);
+    buildCarousel();updateStats();
+    showToast(`${DAYS_FULL[i]} 출장/외근 (9-18) 적용 완료`);
   }
-  saveData(data);
-  buildCarousel();updateStats();
-  showToast(`${DAYS_FULL[i]} 출장/외근 (9-18) 적용 완료`);
 }
 
 /* ═══════════ FRIDAY EARLY-LEAVE CALC ═══════════ */
